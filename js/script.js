@@ -11,10 +11,11 @@ const formSearch = document.querySelector('.form-search'),
 
 // Данные
 
-const citiesApi = 'data/cities.json',
+const citiesApi = 'http://api.travelpayouts.com/data/ru/cities.json',
     proxy = 'https://cors-anywhere.herokuapp.com/',
     API_KEY = '702eb552caf61ff8e2ac53e2926fd3d9',
-    calendar = 'http://min-prices.aviasales.ru/calendar_preload';
+    calendar = 'http://min-prices.aviasales.ru/calendar_preload',
+    MAX_COUNT = 10;
 
 let city = [];
 
@@ -67,6 +68,52 @@ const selectSity = (event, input, list) => {
     }
 };
 
+const getNameCity = (code) =>{
+    const objCity = city.find((item) => item.code === code);
+    return objCity.name;
+};
+
+const getDate = (date) => {
+    return new Date(date).toLocaleString('ru', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+};
+
+const getChanges = (num) => {
+    if (num){
+        return num === 1 ? 'C одной пересадкой' : 'С двумя пересадками';
+
+    } else {
+        return 'Без пересадок'
+    }
+};
+
+const getLinkAviasales = (data) => {
+    let link = 'https://www.aviasales.ru/search/';
+
+    link += data.origin;
+
+    const date = new Date(data.depart_date);
+
+    const day = date.getDate();
+
+    link += day < 10 ? '0' + day : day;
+
+    const month = date.getMonth() + 1;
+
+    link += month < 10? '0' + month : month;
+
+    link += data.destination;
+    
+    link += '1';
+
+    return link;
+};
+
 const createCard = (data) => {
     const ticket = document.createElement('article');
     ticket.classList.add('ticket');
@@ -78,20 +125,20 @@ const createCard = (data) => {
             <h3 class="agent">${data.gate}</h3>
             <div class="ticket__wrapper">
                 <div class="left-side">
-                    <a href="https://www.aviasales.ru/search/SVX2905KGD1" class="button button__buy">Купить за ${data.value}₽</a>
+                    <a href="${getLinkAviasales(data)}" target = "_blak" class="button button__buy">Купить за ${data.value}₽</a>
                 </div>
                 <div class="right-side">
                 <div class="block-left">
                     <div class="city__from">Вылет из города
-                        <span class="city__name">${data.origin}</span>
+                        <span class="city__name">${getNameCity(data.origin)}</span>
                     </div>
-                    <div class="date">${data.depart_date}</div>
+                    <div class="date">${getDate(data.depart_date)}</div>
                 </div>
 
                 <div class="block-right">
-                    <div class="changes">Без пересадок</div>
+                    <div class="changes">${getChanges(data.number_of_changes)}</div>
                     <div class="city__to">Город назначения:
-                        <span class="city__name">${data.destination}</span>
+                        <span class="city__name">${getNameCity(data.destination)}</span>
                     </div>
                 </div>
                 </div>
@@ -104,29 +151,43 @@ const createCard = (data) => {
     ticket.insertAdjacentHTML('afterbegin', deep);
 
     return ticket;
+    
+    
 };
 
+
 const renderCheapDay = (cheapTicket) => {
+    cheapestTicket.style.display = 'block';
+    cheapestTicket.innerHTML = '<h2>Самый дешевый билет на выбранную дату</h2>';
     const ticket = createCard(cheapTicket[0]);
     cheapestTicket.append(ticket);
+    console.log(cheapTicket);
+ 
     
 };
 const renderCheapYear = (cheapTickets) => {
 
-    console.log(cheapTickets);
+   otherCheapTickets.style.display = 'block';
+    otherCheapTickets.innerHTML = '<h2>Самst дешевые билеты на другие даты</h2>';
+
     cheapTickets.sort((a, b) => a.value - b.value);
 
+    for (let i = 0; i < cheapTickets.length && i < MAX_COUNT; i++) {
+        const  ticket = createCard(cheapTickets[i]);
+        otherCheapTickets.append(ticket);
+    }
 };
 
 const renderCheap = (data, date) => {
     const cheapTicketYear = JSON.parse(data).best_prices;
 
     const cheapTicketDay = cheapTicketYear.filter((item) => {
-        return item.depapart_date === date;
+        return item.depart_date == date;
     });
     renderCheapDay(cheapTicketDay);
     renderCheapYear(cheapTicketYear);
 
+    
 };
 
 // Обработчики события
@@ -149,8 +210,7 @@ dropdownCitiesTo.addEventListener('click', (event) => {
 });
 
 formSearch.addEventListener('submit', (event) => {
-    event.preventDefault()
-
+    event.preventDefault();
     const cityFrom = city.find((item) => inputCitiesFrom.value === item.name);
     const cityTo = city.find((item) => inputCitiesTo.value === item.name);
 
@@ -173,7 +233,7 @@ formSearch.addEventListener('submit', (event) => {
 });
 
 // Вызовы функций
-getData(citiesApi, (data) => {
+getData(proxy + citiesApi, (data) => {
     city = JSON.parse(data).filter(item => item.name);
 
     city.sort((a, b) => {
